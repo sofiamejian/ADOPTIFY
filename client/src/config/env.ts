@@ -4,6 +4,14 @@ export const env = {
   supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
 }
 
-if (!env.apiUrl || !env.supabaseUrl || !env.supabaseAnonKey) {
-  throw new Error('Missing required VITE_ environment variables')
+const missing = [
+  !env.apiUrl && 'VITE_API_URL',
+  !env.supabaseUrl && 'VITE_SUPABASE_URL',
+  !env.supabaseAnonKey && 'VITE_SUPABASE_ANON_KEY',
+].filter(Boolean)
+
+if (missing.length > 0) {
+  throw new Error(
+    `Faltan variables en client/.env: ${missing.join(', ')}. Reinicia npm run dev después de guardar.`,
+  )
 }

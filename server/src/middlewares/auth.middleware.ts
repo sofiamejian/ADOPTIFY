@@ -37,6 +37,25 @@ export const authMiddleware = async (
 
     const role = (user.user_metadata?.role as string | undefined)?.toUpperCase() ?? 'ADOPTER'
 
+    const { data: existingUser } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (!existingUser) {
+      const { error: insertError } = await supabaseAdmin.from('users').insert({
+        id: user.id,
+        name: (user.user_metadata?.full_name as string | undefined) ?? 'Usuario',
+        email: user.email,
+        role,
+      })
+
+      if (insertError) {
+        console.error('[auth] No se pudo crear fila en users:', insertError.message)
+      }
+    }
+
     req.user = {
       id: user.id,
       email: user.email ?? '',
