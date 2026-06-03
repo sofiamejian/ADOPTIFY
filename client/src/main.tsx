@@ -1,10 +1,18 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { Toaster } from 'react-hot-toast'
+import { AuthProvider } from './providers/AuthProvider'
+import { PetsProvider } from './providers/PetsProvider'
+import { AppRouter } from './routes/AppRouter'
 import './index.css'
-import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <AuthProvider>
+      <PetsProvider>
+        <AppRouter />
+        <Toaster position="top-right" />
+      </PetsProvider>
+    </AuthProvider>
   </StrictMode>,
 )
