@@ -1,78 +1,58 @@
-import type { Request, Response } from "express";
-import { PetsService } from "./pets.service";
-import { createPetSchema } from "./pets.schemas";
-
+import type { Response } from 'express'
+import type { AuthRequest } from '../../middlewares/auth.middleware'
+import type { PetsService } from './pets.service'
+import type { ListPetsFilters } from './pets.types'
 
 export class PetsController {
-  static async getAllPets(req: Request, res: Response) {
+  constructor(private readonly petsService: PetsService) {}
 
-    try {
-      const pets = await PetsService.getAllPets();
+  list = async (req: AuthRequest, res: Response): Promise<void> => {
+    const filters = req.query as unknown as ListPetsFilters
+    const pets = await this.petsService.list(filters)
 
-      res.status(200).json({
-        success: true,
-        data: pets,
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: error instanceof Error ? error.message : "Server error",
-      });
-    }
+    res.status(200).json({
+      success: true,
+      data: pets,
+    })
   }
 
-  static async getPetById(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
+  getById = async (req: AuthRequest, res: Response): Promise<void> => {
+    const id = String(req.params.id)
+    const pet = await this.petsService.getById(id)
 
-      if (typeof id !== "string") {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid id",
-        });
-      }
-
-      const pet = await PetsService.getPetById(id);
-
-
-      res.status(200).json({
-        success: true,
-        data: pet,
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: error instanceof Error ? error.message : "Server error",
-      });
-    }
+    res.status(200).json({
+      success: true,
+      data: pet,
+    })
   }
 
-  static async createPet(req: Request, res: Response) {
-    try {
-      const validation = createPetSchema.safeParse(req.body);
+  create = async (req: AuthRequest, res: Response): Promise<void> => {
+    const shelterId = req.user!.id
+    const pet = await this.petsService.create(shelterId, req.body)
 
-      if (!validation.success) {
-        return res.status(400).json({
-          success: false,
-          errors: validation.error.flatten(),
-        });
-      }
+    res.status(201).json({
+      success: true,
+      data: pet,
+    })
+  }
 
-      const shelterId = req.body.shelter_id as string;
+  update = async (req: AuthRequest, res: Response): Promise<void> => {
+    const id = String(req.params.id)
+    const pet = await this.petsService.update(id, req.user!.id, req.body)
 
-      const pet = await PetsService.createPet(shelterId, validation.data as any);
+    res.status(200).json({
+      success: true,
+      data: pet,
+    })
+  }
 
+  remove = async (req: AuthRequest, res: Response): Promise<void> => {
+    const id = String(req.params.id)
+    await this.petsService.remove(id, req.user!.id)
 
-      res.status(201).json({
-        success: true,
-        data: pet,
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: error instanceof Error ? error.message : "Server error",
-      });
-    }
+    res.status(200).json({
+      success: true,
+      message: 'Mascota eliminada',
+    })
   }
 }
-

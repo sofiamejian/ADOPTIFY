@@ -1,53 +1,71 @@
-import { supabase } from "../../config/supabase";
-import { CreatePetDTO } from "./pets.types";
+import { AppError } from '../../middlewares/error.middleware'
+import {
+  RealtimeService,
+  type PetRealtimeEvent,
+} from '../../shared/realtime/realtime.service'
+import { PetsRepository } from './pets.repository'
+import type {
+  CreatePetDTO,
+  ListPetsFilters,
+  Pet,
+  UpdatePetDTO,
+} from './pets.types'
 
 export class PetsService {
-  static async getAllPets() {
-    const { data, error } = await supabase
-      .from("pets")
-      .select("*")
-      .order("created_at", { ascending: false });
+  constructor(
+    private readonly repository: PetsRepository,
+    private readonly realtime: RealtimeService,
+  ) {}
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return data;
+  async list(filters: ListPetsFilters): Promise<Pet[]> {
+    return this.repository.findAll(filters)
   }
 
-  static async getPetById(id: string) {
-    const { data, error } = await supabase
-      .from("pets")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error) {
-      throw new Error(error.message);
+  async getById(id: string): Promise<Pet> {
+    try {
+      return await this.repository.findById(id)
+    } catch {
+      throw new AppError('Mascota no encontrada', 404)
     }
-
-    return data;
   }
 
-  static async createPet(
+  async create(shelterId: string, payload: CreatePetDTO): Promise<Pet> {
+    const pet = await this.repository.create(shelterId, payload)
+    await this.broadcast('pet:created', { pet, petId: pet.id })
+    return pet
+  }
+
+  async update(
+    petId: string,
     shelterId: string,
-    petData: CreatePetDTO
-  ) {
-    const { data, error } = await supabase
-      .from("pets")
-      .insert([
-        {
-          shelter_id: shelterId,
-          ...petData,
-        },
-      ])
-      .select()
-      .single();
+    payload: UpdatePetDTO,
+  ): Promise<Pet> {
+    const ownsPet = await this.repository.belongsToShelter(petId, shelterId)
 
-    if (error) {
-      throw new Error(error.message);
+    if (!ownsPet) {
+      throw new AppError('No tienes permiso para editar esta mascota', 403)
     }
 
-    return data;
+    const pet = await this.repository.update(petId, payload)
+    await this.broadcast('pet:updated', { pet, petId: pet.id })
+    return pet
+  }
+
+  async remove(petId: string, shelterId: string): Promise<void> {
+    const ownsPet = await this.repository.belongsToShelter(petId, shelterId)
+
+    if (!ownsPet) {
+      throw new AppError('No tienes permiso para eliminar esta mascota', 403)
+    }
+
+    await this.repository.delete(petId)
+    await this.broadcast('pet:deleted', { petId })
+  }
+
+  private async broadcast(
+    event: PetRealtimeEvent,
+    payload: { pet?: Pet; petId?: string },
+  ): Promise<void> {
+    await this.realtime.emit(event, payload)
   }
 }
